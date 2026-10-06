@@ -7,7 +7,7 @@ import type {
   RuleProject,
   SampleInput,
 } from '../models/ruleModel';
-import { matchesRule } from './conditionEvaluator';
+import { byPriorityThenRuleOrder, matchesRule } from './conditionEvaluator';
 
 const MAX_CASES = 120_000;
 const MAX_EXAMPLES = 4;
@@ -19,7 +19,7 @@ export function analyzeRules(project: RuleProject): RuleAnalysis {
   const visible = new Set<string>();
   const processedMatchSets = new Set<string>();
   const uncoveredExamples: SampleInput[] = [];
-  const ordered = [...project.rules].sort((a, b) => b.priority - a.priority || project.rules.indexOf(a) - project.rules.indexOf(b));
+  const ordered = [...project.rules].sort(byPriorityThenRuleOrder(project.rules));
   let checkedCases = 0;
   let coveredCases = 0;
   let truncated = false;

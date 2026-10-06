@@ -1,4 +1,4 @@
-import type { BusinessRule, PredicateCondition, RuleField } from '../../models/ruleModel';
+import type { BusinessRule, ConditionGroup, PredicateCondition, RuleField } from '../../models/ruleModel';
 import type { WorkspaceState } from '../../viewmodels/workspaceViewModel';
 import type { RulesViewModel } from './rulesViewModel';
 
@@ -28,7 +28,6 @@ export function RulesView({ state, viewModel }: RulesViewProps) {
 interface RuleCardProps { rule: BusinessRule; index: number; fields: RuleField[]; selected: boolean; viewModel: RulesViewModel }
 
 function RuleCard({ rule, index, fields, selected, viewModel }: RuleCardProps) {
-  const updateCondition = (conditionIndex: number, condition: PredicateCondition) => viewModel.updateCondition(rule.id, conditionIndex, condition);
   return (
     <article data-rule-id={rule.id} className={`rule-card card-surface${selected ? ' rule-card-selected' : ''}`} onFocus={() => viewModel.selectRule(rule.id)}>
       <header className="rule-card-header">
@@ -38,14 +37,41 @@ function RuleCard({ rule, index, fields, selected, viewModel }: RuleCardProps) {
         <button className="icon-button danger-hover" aria-label={`删除${rule.name}`} onClick={() => viewModel.removeRule(rule.id)}>×</button>
       </header>
       <div className="condition-area">
-        <div className="condition-title"><span>满足以下条件</span><select aria-label={`${rule.name}条件组合`} value={rule.conditions.operator} onChange={(event) => viewModel.setGroupOperator(rule.id, event.target.value as 'and' | 'or')}><option value="and">全部满足 · AND</option><option value="or">任一满足 · OR</option></select></div>
-        {rule.conditions.conditions.map((condition, conditionIndex) => condition.kind === 'predicate' ? (
-          <ConditionRow key={`${rule.id}-${conditionIndex}`} field={fields.find((candidate) => candidate.id === condition.fieldId)} fields={fields} condition={condition} onFieldChange={(fieldId) => viewModel.changeConditionField(rule.id, conditionIndex, fieldId)} onChange={(next) => updateCondition(conditionIndex, next)} onRemove={() => viewModel.removeCondition(rule.id, conditionIndex)} />
-        ) : <div className="nested-condition" key={`${rule.id}-${conditionIndex}`}>条件组 · {condition.operator.toUpperCase()} ({condition.conditions.length} 项)</div>)}
-        <button className="text-button add-condition" disabled={fields.length === 0} onClick={() => viewModel.addCondition(rule.id)}>＋ 添加条件</button>
+        <ConditionGroupEditor rule={rule} group={rule.conditions} path={[]} depth={0} fields={fields} viewModel={viewModel} />
       </div>
       <div className="result-row"><div className="result-label"><span className="result-arrow">↳</span><span>命中结果</span></div><input aria-label={`${rule.name}命中结果`} value={rule.result} onChange={(event) => viewModel.updateRule(rule.id, { result: event.target.value })} placeholder="例如：自动通过 / 应用 9 折" /></div>
     </article>
+  );
+}
+
+interface ConditionGroupEditorProps { rule: BusinessRule; group: ConditionGroup; path: number[]; depth: number; fields: RuleField[]; viewModel: RulesViewModel }
+
+function ConditionGroupEditor({ rule, group, path, depth, fields, viewModel }: ConditionGroupEditorProps) {
+  const isRoot = depth === 0;
+  return (
+    <div className={isRoot ? 'condition-group' : 'condition-group nested-condition'}>
+      <div className="condition-title">
+        <span>{isRoot ? '满足以下条件' : '嵌套条件组'}</span>
+        <div className="condition-title-actions">
+          <select aria-label={isRoot ? `${rule.name}条件组合` : `${rule.name}嵌套条件组组合`} value={group.operator} onChange={(event) => viewModel.setGroupOperator(rule.id, path, event.target.value as 'and' | 'or')}><option value="and">全部满足 · AND</option><option value="or">任一满足 · OR</option></select>
+          {!isRoot && <button className="icon-button danger-hover" aria-label="删除条件组" title="删除整个条件组" onClick={() => viewModel.removeGroup(rule.id, path)}>×</button>}
+        </div>
+      </div>
+      {group.conditions.length === 0 && <div className="condition-empty">空条件组无法求值，请添加条件{isRoot ? '。' : '或删除该组。'}</div>}
+      {group.conditions.map((condition, conditionIndex) => {
+        const childPath = [...path, conditionIndex];
+        const key = `${rule.id}-${childPath.join('-')}`;
+        return condition.kind === 'predicate' ? (
+          <ConditionRow key={key} field={fields.find((candidate) => candidate.id === condition.fieldId)} fields={fields} condition={condition} onFieldChange={(fieldId) => viewModel.changeConditionField(rule.id, childPath, fieldId)} onChange={(next) => viewModel.updateCondition(rule.id, childPath, next)} onRemove={() => viewModel.removeCondition(rule.id, childPath)} />
+        ) : (
+          <ConditionGroupEditor key={key} rule={rule} group={condition} path={childPath} depth={depth + 1} fields={fields} viewModel={viewModel} />
+        );
+      })}
+      <div className="condition-actions">
+        <button className="text-button add-condition" disabled={fields.length === 0} onClick={() => viewModel.addCondition(rule.id, path)}>＋ 添加条件</button>
+        <button className="text-button add-group" disabled={fields.length === 0} onClick={() => viewModel.addGroup(rule.id, path)}>＋ 添加条件组</button>
+      </div>
+    </div>
   );
 }
 

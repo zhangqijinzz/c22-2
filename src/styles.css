@@ -185,6 +185,7 @@ button:disabled { cursor: not-allowed !important; opacity: .5; }
 .condition-area { padding: 10px 13px 8px; }
 .condition-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; color: #819089; font-size: 8px; font-weight: 650; }
 .condition-title select { height: 22px; padding: 0 19px 0 7px; border: 1px solid #e6ede9; border-radius: 4px; background: #fdfefd; color: #6e837a; font-size: 8px; }
+.condition-title-actions { display: flex; align-items: center; gap: 6px; }
 .condition-row { display: grid; grid-template-columns: minmax(100px, 1.15fr) minmax(94px, .9fr) minmax(105px, .9fr) 22px; align-items: center; gap: 7px; margin-top: 6px; }
 .condition-row > select, .condition-row > input { height: 27px; }
 .condition-row select { padding-right: 20px; }
@@ -192,9 +193,11 @@ button:disabled { cursor: not-allowed !important; opacity: .5; }
 .condition-range input { min-width: 0; height: 27px; padding: 0 6px; }
 .condition-remove { color: #adb8b3; }
 .condition-error { display: flex; justify-content: space-between; padding: 7px 9px; border-radius: 5px; background: #fff8f4; color: #b77668; font-size: 9px; }
-.nested-condition { margin: 6px 0; padding: 7px 9px; border: 1px dashed #dce6e0; border-radius: 5px; color: #6c8879; font-size: 9px; }
+.nested-condition { margin: 6px 0; padding: 8px 9px 6px; border: 1px solid #dde8e1; border-left: 3px solid #95c5a9; border-radius: 6px; background: #f6faf7; }
+.nested-condition .nested-condition { background: #eef6f0; border-left-color: #7fb393; }
+.condition-empty { margin: 6px 0; padding: 7px 9px; border-radius: 5px; background: #fff8f4; color: #b77668; font-size: 9px; }
 .boolean-value { display: flex; align-items: center; height: 27px; padding: 0 9px; border: 1px solid #e4ebe7; border-radius: 5px; background: #fbfcfb; color: #628872; font-size: 9px; }
-.add-condition { margin-top: 8px; }
+.condition-actions { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
 .result-row { display: flex; align-items: center; gap: 10px; padding: 9px 13px 11px; border-top: 1px solid #edf2ef; background: #fbfdfb; }
 .result-label { display: flex; align-items: center; gap: 5px; min-width: 98px; color: #6b897b; font-size: 8px; font-weight: 650; }
 .result-arrow { color: #75aa8b; font-size: 14px; }

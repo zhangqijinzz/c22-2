@@ -31,7 +31,7 @@ export function validateProject(project: RuleProject): ValidationIssue[] {
     ruleNames.add(rule.name.trim());
     if (!Number.isFinite(rule.priority)) issues.push({ code: 'rule-priority', ruleId: rule.id, message: `${rule.name}的优先级无效` });
     if (!rule.result.trim()) issues.push({ code: 'rule-result', ruleId: rule.id, message: `${rule.name}需要填写结果` });
-    validateCondition(rule.conditions, rule.id, fieldById, fieldIds, issues);
+    validateCondition(rule.conditions, rule.id, rule.name || rule.id, fieldById, fieldIds, issues, true);
   }
   return issues;
 }
@@ -39,40 +39,48 @@ export function validateProject(project: RuleProject): ValidationIssue[] {
 function validateCondition(
   condition: RuleCondition,
   ruleId: string,
+  ruleName: string,
   fieldById: Map<string, RuleField>,
   fieldIds: Set<string>,
   issues: ValidationIssue[],
+  isRoot = false,
 ): void {
   if (condition.kind === 'group') {
-    if (condition.conditions.length === 0) issues.push({ code: 'empty-condition', ruleId, message: `规则 ${ruleId} 至少需要一个条件` });
-    for (const child of condition.conditions) validateCondition(child, ruleId, fieldById, fieldIds, issues);
+    if (condition.conditions.length === 0) {
+      issues.push(isRoot
+        ? { code: 'empty-condition', ruleId, message: `${ruleName}至少需要一个条件` }
+        : { code: 'empty-condition-group', ruleId, message: `${ruleName}存在空的条件组，请补充条件或删除该组` });
+    } else if (!isRoot && condition.conditions.length === 1) {
+      issues.push({ code: 'single-child-group', ruleId, message: `${ruleName}存在只有一个子项的条件组，请展开或补齐子项` });
+    }
+    for (const child of condition.conditions) validateCondition(child, ruleId, ruleName, fieldById, fieldIds, issues);
     return;
   }
   const field = fieldById.get(condition.fieldId);
   if (!fieldIds.has(condition.fieldId) || !field) {
-    issues.push({ code: 'missing-field', ruleId, message: `规则 ${ruleId} 引用了已删除的字段` });
+    issues.push({ code: 'missing-field', ruleId, message: `${ruleName}引用了已删除的字段` });
     return;
   }
   if (field.type === 'number') {
     const numericOperator = ['eq', 'gt', 'gte', 'lt', 'lte'].includes(condition.operator);
     const isRange = typeof condition.value === 'object' && condition.value !== null && 'min' in condition.value && 'max' in condition.value;
     if (condition.operator === 'between' && isRange) {
-      if (typeof condition.value.min !== 'number' || typeof condition.value.max !== 'number') issues.push({ code: 'condition-type', ruleId, fieldId: field.id, message: `${ruleId}的数值区间无效` });
-      else if (condition.value.min > condition.value.max) issues.push({ code: 'condition-range-order', ruleId, fieldId: field.id, message: `${ruleId}的区间起点大于终点` });
+      if (typeof condition.value.min !== 'number' || typeof condition.value.max !== 'number') issues.push({ code: 'condition-type', ruleId, fieldId: field.id, message: `${ruleName}的数值区间无效` });
+      else if (condition.value.min > condition.value.max) issues.push({ code: 'condition-range-order', ruleId, fieldId: field.id, message: `${ruleName}的区间起点大于终点` });
     } else if (!numericOperator || typeof condition.value !== 'number') {
-      issues.push({ code: 'condition-type', ruleId, fieldId: field.id, message: `${ruleId}的数值条件类型不匹配` });
+      issues.push({ code: 'condition-type', ruleId, fieldId: field.id, message: `${ruleName}的数值条件类型不匹配` });
     }
     return;
   }
   if (field.type === 'enum') {
     if ((condition.operator !== 'eq' && condition.operator !== 'notEq') || typeof condition.value !== 'string') {
-      issues.push({ code: 'condition-type', ruleId, fieldId: field.id, message: `${ruleId}的枚举条件类型不匹配` });
+      issues.push({ code: 'condition-type', ruleId, fieldId: field.id, message: `${ruleName}的枚举条件类型不匹配` });
     } else if (!(field.enumValues ?? []).includes(condition.value)) {
-      issues.push({ code: 'condition-enum', ruleId, fieldId: field.id, message: `${ruleId}的条件值不在${field.name}的枚举选项中` });
+      issues.push({ code: 'condition-enum', ruleId, fieldId: field.id, message: `${ruleName}的条件值不在${field.name}的枚举选项中` });
     }
     return;
   }
   if ((condition.operator !== 'isTrue' && condition.operator !== 'isFalse') || typeof condition.value !== 'boolean') {
-    issues.push({ code: 'condition-type', ruleId, fieldId: field.id, message: `${ruleId}的布尔条件类型不匹配` });
+    issues.push({ code: 'condition-type', ruleId, fieldId: field.id, message: `${ruleName}的布尔条件类型不匹配` });
   }
 }

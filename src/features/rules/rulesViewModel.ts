@@ -1,6 +1,18 @@
+import {
+  appendConditionAtPath,
+  getConditionAtPath,
+  normalizeConditionTree,
+  removeConditionAtPath,
+  replaceConditionAtPath,
+  setGroupOperatorAtPath,
+} from '../../domain/conditionTree';
 import type { BusinessRule, ConditionGroup, PredicateCondition, RuleField, RuleProject } from '../../models/ruleModel';
 import type { WorkspacePort } from '../../viewmodels/workspacePort';
 
+/**
+ * 规则编辑的全部写操作都按“条件树路径”寻址（根组为 []，每深入一层追加一个子项索引），
+ * 删除后统一经过 normalizeConditionTree，保证空条件组和单子项分组不会留在结构里。
+ */
 export class RulesViewModel {
   constructor(private readonly workspace: WorkspacePort) {}
 
@@ -31,40 +43,90 @@ export class RulesViewModel {
     if (this.workspace.getSnapshot().selectedRuleId === ruleId) this.workspace.selectRule(project.rules.find((rule) => rule.id !== ruleId)?.id);
   }
 
-  setGroupOperator(ruleId: string, operator: ConditionGroup['operator']): void {
-    this.updateRules((rule) => rule.id === ruleId ? { ...rule, conditions: { ...rule.conditions, operator } } : rule, '条件组合已更新');
+  setGroupOperator(ruleId: string, path: number[], operator: ConditionGroup['operator']): void {
+    this.updateRules(
+      (rule) => rule.id === ruleId ? { ...rule, conditions: setGroupOperatorAtPath(rule.conditions, path, operator) } : rule,
+      '条件组合已更新',
+    );
   }
 
-  addCondition(ruleId: string): void {
+  addCondition(ruleId: string, groupPath: number[] = []): void {
     const project = this.currentProject();
     const field = project?.fields[0];
     if (!project || !field) {
       this.workspace.updateView({ notice: '请先定义至少一个字段，再添加规则条件。' });
       return;
     }
-    this.updateRules((rule) => rule.id === ruleId
-      ? { ...rule, conditions: { ...rule.conditions, conditions: [...rule.conditions.conditions, defaultCondition(field)] } }
-      : rule, '已添加一个条件');
+    this.updateRules(
+      (rule) => rule.id === ruleId
+        ? { ...rule, conditions: appendConditionAtPath(rule.conditions, groupPath, defaultCondition(field)) }
+        : rule,
+      '已添加一个条件',
+    );
   }
 
-  updateCondition(ruleId: string, index: number, condition: PredicateCondition): void {
-    this.updateRules((rule) => {
-      if (rule.id !== ruleId) return rule;
-      const conditions = [...rule.conditions.conditions];
-      conditions[index] = condition;
-      return { ...rule, conditions: { ...rule.conditions, conditions } };
-    }, '规则条件已更新');
+  addGroup(ruleId: string, parentPath: number[] = []): void {
+    const project = this.currentProject();
+    const fields = project?.fields ?? [];
+    if (!project || fields.length === 0) {
+      this.workspace.updateView({ notice: '请先定义至少一个字段，再添加规则条件。' });
+      return;
+    }
+    const rule = project.rules.find((candidate) => candidate.id === ruleId);
+    const parent = rule ? getConditionAtPath(rule.conditions, parentPath) : undefined;
+    if (!rule || !parent || parent.kind !== 'group') return;
+    const group: ConditionGroup = {
+      kind: 'group',
+      operator: parent.operator === 'and' ? 'or' : 'and',
+      conditions: [defaultCondition(fields[0]), defaultCondition(fields[1] ?? fields[0])],
+    };
+    this.updateRules(
+      (candidate) => candidate.id === ruleId
+        ? { ...candidate, conditions: appendConditionAtPath(candidate.conditions, parentPath, group) }
+        : candidate,
+      '已添加条件组，可在组内切换 AND / OR',
+    );
   }
 
-  changeConditionField(ruleId: string, index: number, fieldId: string): void {
+  updateCondition(ruleId: string, path: number[], condition: PredicateCondition): void {
+    this.updateRules(
+      (rule) => rule.id === ruleId ? { ...rule, conditions: replaceConditionAtPath(rule.conditions, path, condition) } : rule,
+      '规则条件已更新',
+    );
+  }
+
+  changeConditionField(ruleId: string, path: number[], fieldId: string): void {
     const field = this.currentProject()?.fields.find((candidate) => candidate.id === fieldId);
-    if (field) this.updateCondition(ruleId, index, defaultCondition(field));
+    if (field) this.updateCondition(ruleId, path, defaultCondition(field));
   }
 
-  removeCondition(ruleId: string, index: number): void {
-    this.updateRules((rule) => rule.id === ruleId
-      ? { ...rule, conditions: { ...rule.conditions, conditions: rule.conditions.conditions.filter((_, itemIndex) => itemIndex !== index) } }
-      : rule, '已移除一个条件');
+  removeCondition(ruleId: string, path: number[]): void {
+    if (path.length === 0) return;
+    this.removeNode(ruleId, path, '已移除一个条件', '已移除条件，冗余条件组已自动展开');
+  }
+
+  removeGroup(ruleId: string, path: number[]): void {
+    if (path.length === 0) return;
+    const rule = this.currentProject()?.rules.find((candidate) => candidate.id === ruleId);
+    const target = rule ? getConditionAtPath(rule.conditions, path) : undefined;
+    if (!target || target.kind !== 'group') return;
+    this.removeNode(ruleId, path, '已删除条件组', '已删除条件组，冗余条件组已自动展开');
+  }
+
+  private removeNode(ruleId: string, path: number[], plainNotice: string, collapsedNotice: string): void {
+    const rule = this.currentProject()?.rules.find((candidate) => candidate.id === ruleId);
+    if (!rule) return;
+    const removed = removeConditionAtPath(rule.conditions, path);
+    const normalized = normalizeConditionTree(removed);
+    if (normalized.conditions.length === 0) {
+      this.workspace.updateView({ notice: `${this.findName(ruleId)}至少需要保留一个条件，无法移除。` });
+      return;
+    }
+    const collapsed = normalized !== removed;
+    this.updateRules(
+      (candidate) => candidate.id === ruleId ? { ...candidate, conditions: normalized } : candidate,
+      collapsed ? collapsedNotice : plainNotice,
+    );
   }
 
   private currentProject(): RuleProject | null {

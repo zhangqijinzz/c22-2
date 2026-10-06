@@ -39,6 +39,14 @@ export function matchesRule(rule: BusinessRule, values: SampleInput): boolean {
   return matchesCondition(rule.conditions, values);
 }
 
+/**
+ * 命中顺序的唯一来源：优先级高者在前，同优先级按规则列表顺序。
+ * 样例推演与完整性检查都必须使用它，保证对同一份条件给出同一套解释。
+ */
+export function byPriorityThenRuleOrder(rules: BusinessRule[]): (a: BusinessRule, b: BusinessRule) => number {
+  return (a, b) => b.priority - a.priority || rules.indexOf(a) - rules.indexOf(b);
+}
+
 export function evaluateSample(project: RuleProject, values: SampleInput): SampleEvaluation {
   const errors: string[] = [];
   for (const field of project.fields) {
@@ -59,7 +67,7 @@ export function evaluateSample(project: RuleProject, values: SampleInput): Sampl
   if (errors.length) return { valid: false, errors, matchedRules: [] };
   const matchedRules = project.rules
     .filter((rule) => matchesRule(rule, values))
-    .sort((a, b) => b.priority - a.priority || project.rules.indexOf(a) - project.rules.indexOf(b));
+    .sort(byPriorityThenRuleOrder(project.rules));
   return { valid: true, errors: [], matchedRules, winner: matchedRules[0] };
 }
 
