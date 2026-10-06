@@ -31,7 +31,7 @@ export function validateProject(project: RuleProject): ValidationIssue[] {
     ruleNames.add(rule.name.trim());
     if (!Number.isFinite(rule.priority)) issues.push({ code: 'rule-priority', ruleId: rule.id, message: `${rule.name}的优先级无效` });
     if (!rule.result.trim()) issues.push({ code: 'rule-result', ruleId: rule.id, message: `${rule.name}需要填写结果` });
-    validateCondition(rule.conditions, rule.id, fieldById, fieldIds, issues);
+    validateCondition(rule.conditions, rule.id, fieldById, fieldIds, issues, 0);
   }
   return issues;
 }
@@ -42,10 +42,12 @@ function validateCondition(
   fieldById: Map<string, RuleField>,
   fieldIds: Set<string>,
   issues: ValidationIssue[],
+  depth: number,
 ): void {
   if (condition.kind === 'group') {
     if (condition.conditions.length === 0) issues.push({ code: 'empty-condition', ruleId, message: `规则 ${ruleId} 至少需要一个条件` });
-    for (const child of condition.conditions) validateCondition(child, ruleId, fieldById, fieldIds, issues);
+    else if (depth > 0 && condition.conditions.length === 1) issues.push({ code: 'single-child-group', ruleId, message: `规则 ${ruleId} 存在只含一个条件的嵌套条件组` });
+    for (const child of condition.conditions) validateCondition(child, ruleId, fieldById, fieldIds, issues, depth + 1);
     return;
   }
   const field = fieldById.get(condition.fieldId);

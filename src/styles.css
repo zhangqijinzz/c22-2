@@ -192,7 +192,12 @@ button:disabled { cursor: not-allowed !important; opacity: .5; }
 .condition-range input { min-width: 0; height: 27px; padding: 0 6px; }
 .condition-remove { color: #adb8b3; }
 .condition-error { display: flex; justify-content: space-between; padding: 7px 9px; border-radius: 5px; background: #fff8f4; color: #b77668; font-size: 9px; }
-.nested-condition { margin: 6px 0; padding: 7px 9px; border: 1px dashed #dce6e0; border-radius: 5px; color: #6c8879; font-size: 9px; }
+.condition-group { margin: 6px 0; padding: 8px 9px 6px; border: 1px dashed #d3e2d8; border-radius: 6px; background: #fbfdfb; }
+.condition-group .condition-group { background: #f7faf8; }
+.condition-group .condition-title { margin-bottom: 5px; }
+.condition-title select { margin-left: auto; }
+.group-remove { width: 20px; height: 20px; font-size: 13px; }
+.condition-actions { display: flex; align-items: center; gap: 14px; margin-top: 2px; }
 .boolean-value { display: flex; align-items: center; height: 27px; padding: 0 9px; border: 1px solid #e4ebe7; border-radius: 5px; background: #fbfcfb; color: #628872; font-size: 9px; }
 .add-condition { margin-top: 8px; }
 .result-row { display: flex; align-items: center; gap: 10px; padding: 9px 13px 11px; border-top: 1px solid #edf2ef; background: #fbfdfb; }
